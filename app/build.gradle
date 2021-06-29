@@ -2,15 +2,19 @@ plugins {
     id 'com.android.application'
     id 'kotlin-android'
 }
-
+//WTCompileSdkVersion=28
+//WTBuildToolsVersion=28.0.3
+//WTApplicationId=com.autopai.datacollection
+//WTMinSdkVersion=23
+//WTTargetSdkVersion=28
 android {
-    compileSdkVersion 30
-    buildToolsVersion "30.0.3"
+    compileSdkVersion 28
+    buildToolsVersion "28.0.3"
 
     defaultConfig {
         applicationId "com.ppx.getmsgapp"
         minSdkVersion 16
-        targetSdkVersion 30
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
 
