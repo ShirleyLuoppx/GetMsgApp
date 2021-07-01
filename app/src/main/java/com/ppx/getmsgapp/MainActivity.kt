@@ -1,9 +1,10 @@
 package com.ppx.getmsgapp
 
 import android.Manifest
+import android.app.Activity
 import android.content.DialogInterface
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -11,15 +12,14 @@ import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import okhttp3.*
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
-import java.io.IOException
-import java.lang.Exception
-import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,6 +49,13 @@ class MainActivity : AppCompatActivity() {
         btn_sure = findViewById(R.id.btn_sure)
         tv_phone_content = findViewById(R.id.tv_phone_content)
         tv_message_content = findViewById(R.id.tv_message_content)
+
+        httpUrl = getUrlSp()
+        if (httpUrl.isEmpty()) {
+            et_http_address.setText("")
+        } else {
+            et_http_address.setText(httpUrl)
+        }
     }
 
     private fun clickEvent() {
@@ -62,59 +69,52 @@ class MainActivity : AppCompatActivity() {
         btn_sure.setOnClickListener { //不可编辑状态
             et_http_address.isFocusable = false
             et_http_address.isFocusableInTouchMode = false
+
+            httpUrl = et_http_address.text.toString()
+            Log.d(TAG, "clickEvent: 配置后的网络请求地址：$httpUrl")
+
+            saveUrlSp(httpUrl)
         }
+    }
 
-        et_http_address.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(p0: Editable?) {
-            }
+    //存
+    private fun saveUrlSp(url: String) {
+        val sharedPreferences: SharedPreferences =
+            getSharedPreferences("httpUrlSp", Activity.MODE_PRIVATE)
+        val sp = sharedPreferences.edit()
+        sp.putString("httpUrl", url)
+        sp.apply()
+    }
 
-            override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-            }
-
-            override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-                Log.d(TAG, "onTextChanged: 请求地址：$p0")
-                try {
-                    httpUrl = p0.toString()
-                    sendMsg(phone, message)
-                } catch (e: Exception) {
-                    Log.d(TAG, "onTextChanged: $e")
-                }
-            }
-        })
+    //取
+    private fun getUrlSp(): String {
+        val sharedPreferences: SharedPreferences =
+            getSharedPreferences("httpUrlSp", Activity.MODE_PRIVATE)
+        return sharedPreferences.getString("httpUrl", "")
     }
 
     /**
      * 收到短信数据的时候就发送
      */
     private fun sendMsg(phone: String, message: String) {
-        //创建网络处理的对象
-        val client: OkHttpClient = OkHttpClient.Builder()
-            .readTimeout(5, TimeUnit.SECONDS)
-            .build()
+        val json = JSONObject()
+        val markdown = JSONObject()
+        json.put("msgtype", "markdown")
 
-        //post请求来获得数据
-        //创建一个RequestBody，存放重要数据的键值对
-        val body: RequestBody = FormBody.Builder()
-            .add("phone", phone)
-            .add("message", message).build()
-        //创建一个请求对象，传入URL地址和相关数据的键值对的对象
-        val request: Request = Request.Builder()
-            .url(httpUrl)
-            .post(body).build()
+        markdown.put(
+            "content",
+            "<font color='#8b0000'>短信内容</font>\\n ><font color='comment'>$message</font>"
+        )
+        json.put("markdown", markdown)
+        val post = json.toString()
 
-        //创建一个能处理请求数据的操作类
-        val call: Call = client.newCall(request)
+        if (httpUrl.startsWith("https://", true) || httpUrl.startsWith("http://", true)) {
+            val user = OkHttpClientUtil.createHttpsPostByjson(httpUrl, post, "application/json")
+            Log.d(TAG, "sendMsg: url：$httpUrl  ， post : $post \n 接口请求返回数据：$user")
+        } else {
+            Log.e(TAG, "sendMsg: http请求格式不正确")
+        }
 
-        //使用异步任务的模式请求数据
-        call.enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("ippx", "错误信息：$e")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                Log.e("ippx", response.body.toString())
-            }
-        })
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -125,6 +125,16 @@ class MainActivity : AppCompatActivity() {
         tv_phone_content.text = phone
         tv_message_content.text = message
 
+        if (httpUrl.isEmpty()) {
+            /**
+             * 没有默认的地址
+             */
+//            httpUrl =
+//                "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=267748b0-f4ed-49a1-a73c-ad4a22061825"
+            Toast.makeText(this, "首次进入应用需要配置应用请求地址哦~", Toast.LENGTH_SHORT).show()
+        } else {
+            sendMsg(phone, message)
+        }
     }
 
     private fun requestPermission() {
