@@ -1,25 +1,31 @@
 package com.ppx.getmsgapp
 
 import android.Manifest
+import android.annotation.TargetApi
 import android.app.Activity
+import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Log
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
+import android.view.View
+import android.view.Window
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.ppx.getmsgapp.MyApplication.getContext
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import org.json.JSONObject
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,6 +38,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var et_http_address: EditText
     private lateinit var tv_phone_content: TextView
     private lateinit var tv_message_content: TextView
+    private lateinit var iv_history: ImageView
+    private val manager =
+        getContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         requestPermission()
         clickEvent()
         EventBus.getDefault().register(this)
+        setStatusBarColor(this, R.color.blue)
     }
 
     private fun initView() {
@@ -49,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         btn_sure = findViewById(R.id.btn_sure)
         tv_phone_content = findViewById(R.id.tv_phone_content)
         tv_message_content = findViewById(R.id.tv_message_content)
+        iv_history = findViewById(R.id.iv_history)
 
         httpUrl = getUrlSp()
         if (httpUrl.isEmpty()) {
@@ -59,6 +70,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clickEvent() {
+
+        iv_history.setOnClickListener {
+            startActivity(Intent(this, HistoryMsgActivity::class.java))
+        }
 
         btn_edit.setOnClickListener { //可编辑状态
             et_http_address.isFocusable = true
@@ -74,6 +89,19 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "clickEvent: 配置后的网络请求地址：$httpUrl")
 
             saveUrlSp(httpUrl)
+        }
+
+        et_http_address.setOnFocusChangeListener { view, hasFocus ->
+            Log.d(TAG, "clickEvent: $hasFocus")
+            if (!hasFocus) {
+                //收起软键盘
+                manager.hideSoftInputFromWindow(
+                    view?.windowToken,
+                    InputMethodManager.HIDE_NOT_ALWAYS
+                )
+            } else {
+                manager.showSoftInput(view, 0)
+            }
         }
     }
 
@@ -183,6 +211,21 @@ class MainActivity : AppCompatActivity() {
                 DialogInterface.OnClickListener { dialog, which -> // 一般情况下如果用户不授权的话，功能是无法运行的，做退出处理
                     finish()
                 }).show()
+    }
+
+    /**
+     * 修改状态栏颜色，支持4.4以上版本
+     * @param activity
+     * @param colorId
+     */
+    fun setStatusBarColor(activity: Activity, colorId: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val window: Window = activity.window
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            window.setStatusBarColor(activity.resources.getColor(colorId))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        }
     }
 
     override fun onDestroy() {
